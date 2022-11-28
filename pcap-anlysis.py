@@ -83,6 +83,13 @@ def process_pcap(file_name):
                 if disp_mais_usou_rede['count'] < count:
                         disp_mais_usou_rede = {'ip': ip_packet.src, 'count': count}
 
+    '''dez_mais = heapq.nlargest(10 , ips_dst.items(), key=lambda i: i[1]['count'])
+    print("Os dez IPs de destino mais requisitados por dispositivos da rede são:\n")
+    for key, value in dez_mais:
+        unique, counts = np.unique(value['data'], return_counts=True) 
+        response = requests.get(f'http://ip-api.com/json/{key}').json()
+        print("\t {}: {} (nº de requisições {}, {})\n".format(key,response, value['count'],  dict(zip(unique, counts))))'''
+
     dez_mais = heapq.nlargest(10 + len(dispositivos), ips_dst.items(), key=lambda i: i[1]['count'])
     print("Os dez IPs de destino externos mais requisitados por dispositivos da rede são:\n")
     contador_ips_dst = 0
