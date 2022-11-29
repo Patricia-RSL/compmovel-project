@@ -29,7 +29,7 @@ def process_dst(ip_packet, ips_dst, ip_mais_acessado, dispositivos):
             ip_mais_acessado = {'ip':ip_dst, 'count': count}
     return ips_dst, ip_mais_acessado
 
-def process_pcap(file_name):
+def process_pcap(file_name, opponent_filter = None, opponent_filter_ipv6 = None):
     print('Opening {}...'.format(file_name))
 
     count = 0
@@ -46,10 +46,20 @@ def process_pcap(file_name):
     ip_mais_acessado = {'ip': None, 'count': 0}
 
     for packet in PcapReader(file_name):
+        #print(packet.summary())
+        if opponent_filter:
+            if packet.haslayer('ARP') and (packet['ARP'].psrc == opponent_filter or packet['ARP'].pdst == opponent_filter):
+                continue            
+            elif packet.haslayer('IP') and (packet['IP'].src == opponent_filter or packet['IP'].dst == opponent_filter):
+                continue
+            elif packet.haslayer('IPv6') and (packet['IPv6'].src in opponent_filter_ipv6 or packet['IPv6'].dst in opponent_filter_ipv6):
+                print('{} - {}'.format(packet['IPv6'].src, packet['IPv6'].dst))
+                continue
+        #print(packet.summary())
         horarios.append(datetime.fromtimestamp(packet.time))
         tamanhos.append(len(packet))          
         tipos.append(packet.getlayer(1).name)
-        if packet.haslayer('IP'):
+        if packet.haslayer('IP') :
             tipos_ip.append(packet.getlayer(2).name) 
             ip_packet = packet[IP]
             if ip_packet.src not in dispositivos and ip_packet.src not in ips_origin_extern:
@@ -83,14 +93,15 @@ def process_pcap(file_name):
                 if disp_mais_usou_rede['count'] < count:
                         disp_mais_usou_rede = {'ip': ip_packet.src, 'count': count}
 
-    '''dez_mais = heapq.nlargest(10 , ips_dst.items(), key=lambda i: i[1]['count'])
+    dez_mais = heapq.nlargest(10 , ips_dst.items(), key=lambda i: i[1]['count'])
     print("Os dez IPs de destino mais requisitados por dispositivos da rede são:\n")
     for key, value in dez_mais:
         unique, counts = np.unique(value['data'], return_counts=True) 
         response = requests.get(f'http://ip-api.com/json/{key}').json()
-        print("\t {}: {} (nº de requisições {}, {})\n".format(key,response, value['count'],  dict(zip(unique, counts))))'''
+        print("\t {}: {} (nº de requisições {}, {})\n".format(key,response, value['count'],  dict(zip(unique, counts))))
 
-    dez_mais = heapq.nlargest(10 + len(dispositivos), ips_dst.items(), key=lambda i: i[1]['count'])
+    '''dez_mais = heapq.nlargest(10 + len(dispositivos), ips_dst.items(), key=lambda i: i[1]['count'])
+    print(dez_mais)
     print("Os dez IPs de destino externos mais requisitados por dispositivos da rede são:\n")
     contador_ips_dst = 0
     for key, value in dez_mais:
@@ -100,7 +111,7 @@ def process_pcap(file_name):
             contador_ips_dst +=1  
             print("\t {}: {} (nº de requisições {}, {})\n".format(key,response, value['count'],  dict(zip(unique, counts))))
         if contador_ips_dst == 10:
-            break
+            break'''
 
 
 
@@ -160,6 +171,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PCAP reader')
     parser.add_argument('--pcap', metavar='<pcap file name>',
                         help='pcap file to parse', required=True)
+    parser.add_argument('--opponentFilter', metavar='<Opponent IPv4>',
+                        help='Opponent IP to filter', required=False)
+    parser.add_argument('--opponentFilterIPv6', metavar='<Opponent IPv6 List>',
+                        help='Opponent IPv6 to filter', required=False)
     args = parser.parse_args()
     
     file_name = args.pcap
@@ -167,5 +182,9 @@ if __name__ == '__main__':
         print('"{}" does not exist'.format(file_name), file=sys.stderr)
         sys.exit(-1)
 
-    process_pcap(file_name)
+    
+    opponent_filter = args.opponentFilter
+    opponent_filter_ipv6 = args.opponentFilterIPv6
+
+    process_pcap(file_name, opponent_filter, opponent_filter_ipv6)
     sys.exit(0)
